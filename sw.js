@@ -1,4 +1,4 @@
-const CACHE = "kk-v3";
+const CACHE = "kk-v4";
 const ASSETS = ["./", "./index.html", "./style.css", "./manifest.webmanifest",
   ...Array.from({ length: 10 }, (_, i) => `./stage-${String(i + 1).padStart(2, "0")}.png`),
   "./icon-192.png", "./icon-512.png"];

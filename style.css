@@ -66,3 +66,7 @@ input[type="email"], input[type="password"], input[type="date"], input[type="num
 .zukan-meta .z-month { font-weight: 800; font-size: 15px; }
 .zukan-meta .z-judge { color: #5d4c38; }
 .privacy { text-align: center; font-size: 12px; color: #8a765c; margin: 22px 8px 0; }
+
+.chance { text-align: center; font-weight: 800; color: #c33d0d; font-size: 15px; margin-top: 10px; }
+.peak { text-align: center; font-size: 13px; color: #8a6d3b; margin: 0 2px 10px; }
+.record .r-super { font-size: 12px; font-weight: 800; color: #c33d0d; white-space: nowrap; }

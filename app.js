@@ -12,7 +12,12 @@ const I18N = {
     privacy: "日記の中身は読みません。測るのはインクの量だけ。写真は保存されません。",
     stage: "ステージ", no_records: "まだ記録がありません",
     month_stats: (days, man, kg) => `今月は ${days} 日書いて ${(man).toFixed(1)} 万インク ・ ${kg} kg級`,
-    measured: (man) => `測れました： ${(man).toFixed(1)} 万インク。このまま追加しました`,
+    measured: (man) => `測れました： ${(man).toFixed(1)} 万インク。日付を確認して「追加」を押してください`,
+    added: (man) => `追加しました： ${(man).toFixed(1)} 万インク`,
+    added_super: (man) => `超回復！ ${(man).toFixed(1)} 万インクで追加しました`,
+    super_chance: "今日は超回復のチャンス",
+    super_tag: "超回復",
+    peak_line: (st) => `今月の最高 ステージ ${st}`,
     measuring: "測っています…",
     save_error: (m) => `保存できませんでした： ${m}`,
     zukan_stats: (days, man, kg, st) => `${days} 日 ・ ${(man).toFixed(1)} 万インク ・ ${kg} kg級 ・ 到達ステージ ${st}`,
@@ -32,7 +37,12 @@ const I18N = {
     privacy: "We never read your diary. We only count the ink. Photos are never stored.",
     stage: "Stage", no_records: "No records yet",
     month_stats: (days, man, kg) => `${days} days written this month · ${(man).toFixed(1)}0k ink · class ${kg} kg`,
-    measured: (man) => `Measured: ${(man).toFixed(1)}0k ink. Added.`,
+    measured: (man) => `Measured: ${(man).toFixed(1)}0k ink. Check the date and tap Add.`,
+    added: (man) => `Added: ${(man).toFixed(1)}0k ink`,
+    added_super: (man) => `Super recovery! Added ${(man).toFixed(1)}0k ink`,
+    super_chance: "Super-recovery chance today",
+    super_tag: "super",
+    peak_line: (st) => `This month's best: stage ${st}`,
     measuring: "Measuring…",
     save_error: (m) => `Could not save: ${m}`,
     zukan_stats: (days, man, kg, st) => `${days} days · ${(man).toFixed(1)}0k ink · class ${kg} kg · reached stage ${st}`,
@@ -52,20 +62,37 @@ const WORDS = { ja: ["", "まだ静か", "まだ静か", "集中してきた", "
 
 // ---------- growth ----------
 function scoreOf(monthTotal, dayInk) {
-  const m = CFG.MONTH_WEIGHT * Math.min(Math.sqrt(monthTotal / CFG.MONTH_FULL_INK), 1);
-  const d = CFG.DAY_WEIGHT * Math.sqrt(dayInk / CFG.DAY_FULL_INK);
+  const m = CFG.MONTH_WEIGHT * Math.min(monthTotal / CFG.MONTH_FULL_INK, 1);
+  const d = CFG.DAY_WEIGHT * Math.sqrt(Math.min(dayInk / CFG.DAY_FULL_INK, 1));
   return Math.min(m + d, 1);
 }
 function stageOf(score) { return 1 + Math.floor(Math.min(Math.max(score, 0), 1) * 9.999); }
 function monthKey(dateStr) { return dateStr.slice(0, 7); }
 function kgOf(monthTotal) { return (monthTotal / CFG.KG_DIVISOR).toFixed(1); }
 
+function dayDiff(a, b) { // whole days from a to b, both "YYYY-MM-DD"
+  const pa = a.split("-").map(Number), pb = b.split("-").map(Number);
+  return Math.round((Date.UTC(pb[0], pb[1] - 1, pb[2]) - Date.UTC(pa[0], pa[1] - 1, pa[2])) / 86400000);
+}
+// Super recovery: an entry exactly 2 days after the previous one (one full
+// day rested) counts 1.5x toward growth. Daily writing still wins overall:
+// two written days (2.0x) beat a rest + a boosted return (1.5x).
+const SUPER_MULT = 1.5;
+function superDates(entriesAsc) {
+  const set = new Set();
+  for (let i = 1; i < entriesAsc.length; i++) {
+    if (dayDiff(entriesAsc[i - 1].date, entriesAsc[i].date) === 2) set.add(entriesAsc[i].date);
+  }
+  return set;
+}
+function effectiveInk(e, sup) { return sup.has(e.date) ? Math.round(e.ink * SUPER_MULT) : e.ink; }
+
 // stage reached by each entry, considering entries in the same month up to it
 function computeStages(entriesAsc) {
-  const out = new Map(); const run = {};
+  const out = new Map(); const run = {}; const sup = superDates(entriesAsc);
   for (const e of entriesAsc) {
     const mk = monthKey(e.date);
-    run[mk] = (run[mk] || 0) + e.ink;
+    run[mk] = (run[mk] || 0) + effectiveInk(e, sup);
     out.set(e.id, stageOf(scoreOf(run[mk], e.ink)));
   }
   return out;
@@ -120,11 +147,11 @@ function freezePastMonths() {
   const byMonth = {};
   for (const e of entries) { (byMonth[monthKey(e.date)] = byMonth[monthKey(e.date)] || []).push(e); }
   for (const mk of Object.keys(byMonth)) {
-    if (mk >= curMk || frozen[mk]) continue;
+    if (mk >= curMk) continue;
     const list = byMonth[mk]; const total = list.reduce((s, e) => s + e.ink, 0);
     const maxStage = Math.max(...list.map(e => stages.get(e.id)));
-    frozen[mk] = { stage: maxStage, days: new Set(list.map(e => e.date)).size, totalInk: total, kg: kgOf(total), judge: t("judge", maxStage, list.length) };
-    changed = true;
+    const rec = { stage: maxStage, days: new Set(list.map(e => e.date)).size, totalInk: total, kg: kgOf(total), judge: t("judge", maxStage, list.length) };
+    if (JSON.stringify(frozen[mk]) !== JSON.stringify(rec)) { frozen[mk] = rec; changed = true; }
   }
   if (changed) localStorage.setItem("kk_frozen", JSON.stringify(frozen));
   return frozen;
@@ -180,20 +207,34 @@ function render() {
   $("appName").textContent = CFG.APP_NAME;
   $("langToggle").textContent = lang === "ja" ? "EN" : "あ";
   const stages = computeStages(entries);
-  const last = entries[entries.length - 1];
-  const curStage = last ? stages.get(last.id) : 1;
-  $("stageImg").src = `stage-${String(curStage).padStart(2, "0")}.png`;
-  $("stageLabel").textContent = `${t("stage")} ${curStage}`;
-  $("stageWord").textContent = WORDS[lang][curStage];
-  const curMk = monthKey(todayStr());
+  const sup = superDates(entries);
+  const today = todayStr();
+  const curMk = monthKey(today);
   const monthEntries = entries.filter(e => monthKey(e.date) === curMk);
   const monthTotal = monthEntries.reduce((s, e) => s + e.ink, 0);
+  const last = entries[entries.length - 1];
+  const lastMonthEntry = monthEntries[monthEntries.length - 1];
+  const baseStage = lastMonthEntry ? stages.get(lastMonthEntry.id) : 1;
+  const peakStage = monthEntries.length ? Math.max(...monthEntries.map(e => stages.get(e.id))) : 1;
+  const anchorDate = lastMonthEntry ? lastMonthEntry.date : (last ? last.date : null);
+  const missed = anchorDate ? dayDiff(anchorDate, today) - 1 : null; // full days with no entry before today
+  let displayStage = baseStage;
+  if (missed !== null && missed >= 2) displayStage = Math.max(1, baseStage - (missed - 1)); // wilted current form
+  $("stageImg").src = `stage-${String(displayStage).padStart(2, "0")}.png`;
+  $("stageLabel").textContent = `${t("stage")} ${displayStage}`;
+  $("stageWord").textContent = WORDS[lang][displayStage];
+  const chance = missed === 1;
+  $("chanceLine").classList.toggle("hidden", !chance);
+  if (chance) $("chanceLine").textContent = t("super_chance");
+  const showPeak = displayStage < peakStage;
+  $("peakLine").classList.toggle("hidden", !showPeak);
+  if (showPeak) $("peakLine").textContent = t("peak_line", peakStage);
   $("monthStats").textContent = t("month_stats", new Set(monthEntries.map(e => e.date)).size, monthTotal / 10000, kgOf(monthTotal));
 
   const rl = $("recordList");
   if (!entries.length) { rl.innerHTML = `<div class="empty">${t("no_records")}</div>`; }
   else rl.innerHTML = [...entries].reverse().map(e =>
-    `<div class="record"><span>${e.date}</span><span>${(e.ink / 10000).toFixed(1)}万</span><span class="r-stage">${t("stage")} ${stages.get(e.id)}</span><button class="del" data-del="${e.id}" type="button">×</button></div>`).join("");
+    `<div class="record"><span>${e.date}</span><span>${(e.ink / 10000).toFixed(1)}万</span>${sup.has(e.date) ? `<span class="r-super">${t("super_tag")}</span>` : ""}<span class="r-stage">${t("stage")} ${stages.get(e.id)}</span><button class="del" data-del="${e.id}" type="button">×</button></div>`).join("");
   rl.querySelectorAll("[data-del]").forEach(b => b.addEventListener("click", async () => {
     if (confirm(t("del_confirm"))) { await deleteEntry(b.dataset.del); render(); }
   }));
@@ -218,9 +259,8 @@ $("photoInput").addEventListener("change", async (ev) => {
   $("measureMsg").textContent = t("measuring");
   try {
     const ink = await measureInk(f);
-    await addEntry(todayStr(), ink);
+    $("manualInk").value = (ink / 10000).toFixed(1);
     $("measureMsg").textContent = t("measured", ink / 10000);
-    render();
   } catch (e) { $("measureMsg").textContent = t("save_error", e.message || "error"); }
   saving = false;
   ev.target.value = "";
@@ -232,7 +272,9 @@ $("manualAdd").addEventListener("click", async () => {
   saving = true;
   try {
     await addEntry(date, Math.round(man * 10000));
-    $("manualInk").value = ""; render();
+    $("manualInk").value = "";
+    $("measureMsg").textContent = superDates(entries).has(date) ? t("added_super", man) : t("added", man);
+    render();
   } catch (e) { $("measureMsg").textContent = t("save_error", e.message || "error"); }
   saving = false;
 });
