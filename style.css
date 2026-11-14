@@ -1,0 +1,68 @@
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: #faf3e3; color: #2b2118;
+  font-family: "Hiragino Maru Gothic ProN", "Hiragino Sans", "Noto Sans JP", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 14px 16px 6px; max-width: 560px; margin: 0 auto;
+}
+.app-name { font-size: 22px; font-weight: 800; letter-spacing: .04em; }
+.header-right { display: flex; gap: 8px; }
+.chip {
+  border: 2px solid #2b2118; background: #fff; border-radius: 999px;
+  padding: 4px 12px; font-weight: 700; font-size: 13px; cursor: pointer;
+}
+main { max-width: 560px; margin: 0 auto; padding: 8px 14px 40px; }
+.hidden { display: none !important; }
+.demo {
+  background: #ffe9a8; border: 2px dashed #b98a1c; color: #6b4d05;
+  border-radius: 10px; padding: 6px 10px; font-size: 12.5px; text-align: center; margin: 6px 0 2px;
+}
+.stage-frame {
+  border: 3px solid #2b2118; border-radius: 14px; overflow: hidden; background: #fff;
+  box-shadow: 0 4px 0 #2b2118;
+}
+.stage-frame img { width: 100%; display: block; image-rendering: pixelated; }
+.stage-line { display: flex; align-items: baseline; gap: 12px; margin: 12px 2px 2px; }
+#stageLabel { font-size: 20px; font-weight: 800; }
+#stageWord { font-size: 17px; font-weight: 700; color: #c33d0d; }
+.month-stats { font-size: 13.5px; color: #5d4c38; margin: 2px 2px 14px; }
+.card {
+  background: #fff; border: 2px solid #2b2118; border-radius: 14px;
+  padding: 14px; margin: 14px 0; box-shadow: 0 3px 0 #2b2118;
+}
+.card-title { font-weight: 800; font-size: 16px; margin-bottom: 10px; }
+.btn {
+  border: 2px solid #2b2118; background: #fff; border-radius: 10px;
+  padding: 9px 14px; font-weight: 700; font-size: 15px; cursor: pointer;
+}
+.btn.primary { background: #ffcf3f; }
+.btn:active { transform: translateY(1px); }
+.file-btn { display: block; text-align: center; }
+.row { display: flex; gap: 8px; margin-top: 10px; }
+.row input { flex: 1; min-width: 0; }
+input[type="email"], input[type="password"], input[type="date"], input[type="number"] {
+  border: 2px solid #cbbb9d; border-radius: 10px; padding: 9px 10px; font-size: 15px;
+  width: 100%; margin: 4px 0; background: #fffdf7;
+}
+.hint { font-size: 12px; color: #8a765c; margin-top: 6px; }
+.msg { font-size: 13.5px; margin-top: 8px; min-height: 1em; color: #33551f; }
+.record {
+  display: flex; align-items: center; gap: 10px; padding: 8px 2px;
+  border-bottom: 1px dashed #e2d5ba; font-size: 14.5px;
+}
+.record:last-child { border-bottom: none; }
+.record .r-stage { margin-left: auto; font-weight: 800; color: #c33d0d; white-space: nowrap; }
+.record .del {
+  border: none; background: none; color: #a08b6d; font-size: 16px; cursor: pointer; padding: 2px 4px;
+}
+.empty { color: #a08b6d; font-size: 14px; padding: 6px 2px; }
+.zukan-item { display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px dashed #e2d5ba; }
+.zukan-item:last-child { border-bottom: none; }
+.zukan-item img { width: 108px; height: auto; border: 2px solid #2b2118; border-radius: 8px; image-rendering: pixelated; }
+.zukan-meta { font-size: 13.5px; line-height: 1.55; }
+.zukan-meta .z-month { font-weight: 800; font-size: 15px; }
+.zukan-meta .z-judge { color: #5d4c38; }
+.privacy { text-align: center; font-size: 12px; color: #8a765c; margin: 22px 8px 0; }

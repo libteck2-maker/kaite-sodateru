@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>書いて育てる</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#faf3e3">
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+</head>
+<body>
+<header>
+  <div class="app-name" id="appName">書いて育てる</div>
+  <div class="header-right">
+    <button id="langToggle" class="chip" type="button">EN</button>
+    <button id="authButton" class="chip hidden" type="button"></button>
+  </div>
+</header>
+
+<main>
+  <!-- 認証（Supabase設定時のみ） -->
+  <section id="authSection" class="card hidden">
+    <div class="card-title" data-i18n="login_title">ログイン</div>
+    <input id="authEmail" type="email" autocomplete="email" placeholder="email">
+    <input id="authPassword" type="password" autocomplete="current-password" placeholder="password">
+    <div class="row">
+      <button id="loginBtn" class="btn primary" type="button" data-i18n="login">ログイン</button>
+      <button id="signupBtn" class="btn" type="button" data-i18n="signup">新規登録</button>
+    </div>
+    <div id="authMsg" class="msg"></div>
+  </section>
+  <div id="demoBadge" class="demo hidden" data-i18n="demo_mode">デモモード（この端末にだけ保存されます）</div>
+
+  <!-- メイン -->
+  <section id="stageSection">
+    <div class="stage-frame"><img id="stageImg" src="stage-01.png" alt="stage"></div>
+    <div class="stage-line">
+      <span id="stageLabel">ステージ 1</span>
+      <span id="stageWord">まだ静か</span>
+    </div>
+    <div class="month-stats" id="monthStats"></div>
+  </section>
+
+  <!-- 今日のページ -->
+  <section class="card">
+    <div class="card-title" data-i18n="add_title">今日のページ</div>
+    <label class="btn primary file-btn">
+      <span data-i18n="photo_btn">写真から測る</span>
+      <input id="photoInput" type="file" accept="image/*" hidden>
+    </label>
+    <div id="measureMsg" class="msg"></div>
+    <div class="row">
+      <input id="manualDate" type="date">
+      <input id="manualInk" type="number" inputmode="numeric" min="0" step="0.1">
+      <button id="manualAdd" class="btn" type="button" data-i18n="add">追加</button>
+    </div>
+    <div class="hint" data-i18n="manual_hint">インク量は「万」の単位で手入力もできます</div>
+  </section>
+
+  <!-- 記録 -->
+  <section class="card">
+    <div class="card-title" data-i18n="records">記録</div>
+    <div id="recordList"></div>
+  </section>
+
+  <!-- 図鑑 -->
+  <section class="card">
+    <div class="card-title" data-i18n="zukan">図鑑</div>
+    <div id="zukanList"></div>
+  </section>
+
+  <p class="privacy" data-i18n="privacy">日記の中身は読みません。測るのはインクの量だけ。写真は保存されません。</p>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>
