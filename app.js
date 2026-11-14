@@ -14,6 +14,7 @@ const I18N = {
     month_stats: (days, man, kg) => `今月は ${days} 日書いて ${(man).toFixed(1)} 万インク ・ ${kg} kg級`,
     measured: (man) => `測れました： ${(man).toFixed(1)} 万インク。このまま追加しました`,
     measuring: "測っています…",
+    save_error: (m) => `保存できませんでした： ${m}`,
     zukan_stats: (days, man, kg, st) => `${days} 日 ・ ${(man).toFixed(1)} 万インク ・ ${kg} kg級 ・ 到達ステージ ${st}`,
     judge: (maxStage, days) => maxStage >= 10 ? "燃え尽きた月。文句なし。" :
       maxStage >= 8 ? "よく燃えた月。あと少しで全開。" :
@@ -33,6 +34,7 @@ const I18N = {
     month_stats: (days, man, kg) => `${days} days written this month · ${(man).toFixed(1)}0k ink · class ${kg} kg`,
     measured: (man) => `Measured: ${(man).toFixed(1)}0k ink. Added.`,
     measuring: "Measuring…",
+    save_error: (m) => `Could not save: ${m}`,
     zukan_stats: (days, man, kg, st) => `${days} days · ${(man).toFixed(1)}0k ink · class ${kg} kg · reached stage ${st}`,
     judge: (maxStage, days) => maxStage >= 10 ? "A month burned to the end. No notes." :
       maxStage >= 8 ? "A hot month. Almost full blaze." :
@@ -81,17 +83,20 @@ async function loadEntries() {
   if (DEMO) {
     entries = JSON.parse(localStorage.getItem("kk_entries") || "[]");
   } else {
-    const { data } = await sb.from("entries").select("id,date,ink").order("date", { ascending: true });
+    const { data, error } = await sb.from("entries").select("id,date,ink").order("date", { ascending: true });
+    if (error) throw new Error(error.message);
     entries = data || [];
   }
   entries.sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
 }
 async function addEntry(date, ink) {
   if (DEMO) {
+    entries = entries.filter(e => e.date !== date);
     entries.push({ id: "d" + Date.now(), date, ink });
     localStorage.setItem("kk_entries", JSON.stringify(entries));
   } else {
-    await sb.from("entries").insert({ user_id: user.id, date, ink });
+    const { error } = await sb.from("entries").upsert({ user_id: user.id, date, ink }, { onConflict: "user_id,date" });
+    if (error) throw new Error(error.message);
     await loadEntries();
   }
   entries.sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
@@ -101,7 +106,8 @@ async function deleteEntry(id) {
     entries = entries.filter(e => e.id !== id);
     localStorage.setItem("kk_entries", JSON.stringify(entries));
   } else {
-    await sb.from("entries").delete().eq("id", id);
+    const { error } = await sb.from("entries").delete().eq("id", id);
+    if (error) throw new Error(error.message);
     await loadEntries();
   }
 }
@@ -133,49 +139,28 @@ function measureInk(file) {
       const w = Math.round(img.naturalWidth * scale), h = Math.round(img.naturalHeight * scale);
       const cv = document.createElement("canvas"); cv.width = w; cv.height = h;
       const cx = cv.getContext("2d"); cx.drawImage(img, 0, 0, w, h);
-      const px = cx.getImageData(0, 0, w, h).data; let ink = 0;
-      for (let i = 0; i < px.length; i += 4) {
-        const lum = 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2];
-        if (lum < 128) ink++;
+      const px = cx.getImageData(0, 0, w, h).data;
+      const lum = new Float32Array(w * h);
+      for (let i = 0, j = 0; i < px.length; i += 4, j++) lum[j] = 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2];
+      // Lighting-robust ink count: per 64px block, estimate the paper brightness
+      // (85th percentile) and count pixels darker than half of it. A flat
+      // threshold breaks under shadows and room light; this tracks the paper.
+      const BS = 64; let ink = 0;
+      for (let by = 0; by < h; by += BS) {
+        for (let bx = 0; bx < w; bx += BS) {
+          const bw = Math.min(BS, w - bx), bh = Math.min(BS, h - by);
+          const vals = [];
+          for (let y = 0; y < bh; y++) for (let x = 0; x < bw; x++) vals.push(lum[(by + y) * w + bx + x]);
+          vals.sort((a, b) => a - b);
+          const paper = Math.max(vals[Math.floor(vals.length * 0.85)], 40);
+          const thr = paper * 0.5;
+          for (let i = 0; i < vals.length; i++) if (vals[i] < thr) ink++;
+        }
       }
       URL.revokeObjectURL(url); resolve(ink);
     };
     img.onerror = reject; img.src = url;
   });
-}
-
-// ---------- render ----------
-function todayStr() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; }
-function render() {
-  document.querySelectorAll("[data-i18n]").forEach(el => { el.textContent = t(el.dataset.i18n); });
-  $("appName").textContent = CFG.APP_NAME;
-  $("langToggle").textContent = lang === "ja" ? "EN" : "あ";
-  const stages = computeStages(entries);
-  const last = entries[entries.length - 1];
-  const curStage = last ? stages.get(last.id) : 1;
-  $("stageImg").src = `stage-${String(curStage).padStart(2, "0")}.png`;
-  $("stageLabel").textContent = `${t("stage")} ${curStage}`;
-  $("stageWord").textContent = WORDS[lang][curStage];
-  const curMk = monthKey(todayStr());
-  const monthEntries = entries.filter(e => monthKey(e.date) === curMk);
-  const monthTotal = monthEntries.reduce((s, e) => s + e.ink, 0);
-  $("monthStats").textContent = t("month_stats", new Set(monthEntries.map(e => e.date)).size, monthTotal / 10000, kgOf(monthTotal));
-
-  const rl = $("recordList");
-  if (!entries.length) { rl.innerHTML = `<div class="empty">${t("no_records")}</div>`; }
-  else rl.innerHTML = [...entries].reverse().map(e =>
-    `<div class="record"><span>${e.date}</span><span>${(e.ink / 10000).toFixed(1)}万</span><span class="r-stage">${t("stage")} ${stages.get(e.id)}</span><button class="del" data-del="${e.id}" type="button">×</button></div>`).join("");
-  rl.querySelectorAll("[data-del]").forEach(b => b.addEventListener("click", async () => {
-    if (confirm(t("del_confirm"))) { await deleteEntry(b.dataset.del); render(); }
-  }));
-
-  const frozen = freezePastMonths();
-  const months = Object.keys(frozen).sort().reverse();
-  // current month in progress also shows in the collection area only after it ends; here show past months
-  $("zukanList").innerHTML = months.length ? months.map(mk => {
-    const f = frozen[mk];
-    return `<div class="zukan-item"><img src="stage-${String(f.stage).padStart(2, "0")}.png" alt=""><div class="zukan-meta"><div class="z-month">${mk.replace("-", "/")}</div><div>${t("zukan_stats", f.days, f.totalInk / 10000, f.kg, f.stage)}</div><div class="z-judge">${f.judge}</div></div></div>`;
-  }).join("") : `<div class="empty">${t("no_records")}</div>`;
 }
 
 // ---------- events ----------
@@ -188,15 +173,17 @@ $("photoInput").addEventListener("change", async (ev) => {
     await addEntry(todayStr(), ink);
     $("measureMsg").textContent = t("measured", ink / 10000);
     render();
-  } catch { $("measureMsg").textContent = "error"; }
+  } catch (e) { $("measureMsg").textContent = t("save_error", e.message || "error"); }
   ev.target.value = "";
 });
 $("manualAdd").addEventListener("click", async () => {
   const date = $("manualDate").value || todayStr();
   const man = parseFloat($("manualInk").value);
   if (!man || man <= 0) return;
-  await addEntry(date, Math.round(man * 10000));
-  $("manualInk").value = ""; render();
+  try {
+    await addEntry(date, Math.round(man * 10000));
+    $("manualInk").value = ""; render();
+  } catch (e) { $("measureMsg").textContent = t("save_error", e.message || "error"); }
 });
 
 // ---------- auth ----------

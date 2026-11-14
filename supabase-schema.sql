@@ -18,3 +18,7 @@ create policy "own entries insert" on public.entries
   for insert with check (auth.uid() = user_id);
 create policy "own entries delete" on public.entries
   for delete using (auth.uid() = user_id);
+create policy "own entries update" on public.entries
+  for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+alter table public.entries add constraint entries_user_date_unique unique (user_id, date);
