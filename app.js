@@ -142,6 +142,17 @@ function measureInk(file) {
       const px = cx.getImageData(0, 0, w, h).data;
       const lum = new Float32Array(w * h);
       for (let i = 0, j = 0; i < px.length; i += 4, j++) lum[j] = 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2];
+      // Dark-mode captures (white strokes on black) invert the assumption
+      // "paper is bright": if even the bright end of the image is dark,
+      // flip luminance so paper is bright again before counting.
+      {
+        const sample = [];
+        for (let j = 0; j < lum.length; j += 16) sample.push(lum[j]);
+        sample.sort((a, b) => a - b);
+        if (sample[Math.floor(sample.length * 0.9)] < 128) {
+          for (let j = 0; j < lum.length; j++) lum[j] = 255 - lum[j];
+        }
+      }
       // Lighting-robust ink count: per 64px block, estimate the paper brightness
       // (85th percentile) and count pixels darker than half of it. A flat
       // threshold breaks under shadows and room light; this tracks the paper.
