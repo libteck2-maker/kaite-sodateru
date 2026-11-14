@@ -163,10 +163,14 @@ function measureInk(file) {
   });
 }
 
+let saving = false;
+
 // ---------- events ----------
 $("langToggle").addEventListener("click", () => { lang = lang === "ja" ? "en" : "ja"; localStorage.setItem("kk_lang", lang); render(); });
 $("photoInput").addEventListener("change", async (ev) => {
   const f = ev.target.files[0]; if (!f) return;
+  if (saving) { ev.target.value = ""; return; }
+  saving = true;
   $("measureMsg").textContent = t("measuring");
   try {
     const ink = await measureInk(f);
@@ -174,16 +178,19 @@ $("photoInput").addEventListener("change", async (ev) => {
     $("measureMsg").textContent = t("measured", ink / 10000);
     render();
   } catch (e) { $("measureMsg").textContent = t("save_error", e.message || "error"); }
+  saving = false;
   ev.target.value = "";
 });
 $("manualAdd").addEventListener("click", async () => {
   const date = $("manualDate").value || todayStr();
   const man = parseFloat($("manualInk").value);
-  if (!man || man <= 0) return;
+  if (!man || man <= 0 || saving) return;
+  saving = true;
   try {
     await addEntry(date, Math.round(man * 10000));
     $("manualInk").value = ""; render();
   } catch (e) { $("measureMsg").textContent = t("save_error", e.message || "error"); }
+  saving = false;
 });
 
 // ---------- auth ----------
