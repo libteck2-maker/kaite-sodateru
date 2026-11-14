@@ -163,6 +163,39 @@ function measureInk(file) {
   });
 }
 
+function todayStr() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; }
+function render() {
+  document.querySelectorAll("[data-i18n]").forEach(el => { el.textContent = t(el.dataset.i18n); });
+  $("appName").textContent = CFG.APP_NAME;
+  $("langToggle").textContent = lang === "ja" ? "EN" : "あ";
+  const stages = computeStages(entries);
+  const last = entries[entries.length - 1];
+  const curStage = last ? stages.get(last.id) : 1;
+  $("stageImg").src = `stage-${String(curStage).padStart(2, "0")}.png`;
+  $("stageLabel").textContent = `${t("stage")} ${curStage}`;
+  $("stageWord").textContent = WORDS[lang][curStage];
+  const curMk = monthKey(todayStr());
+  const monthEntries = entries.filter(e => monthKey(e.date) === curMk);
+  const monthTotal = monthEntries.reduce((s, e) => s + e.ink, 0);
+  $("monthStats").textContent = t("month_stats", new Set(monthEntries.map(e => e.date)).size, monthTotal / 10000, kgOf(monthTotal));
+
+  const rl = $("recordList");
+  if (!entries.length) { rl.innerHTML = `<div class="empty">${t("no_records")}</div>`; }
+  else rl.innerHTML = [...entries].reverse().map(e =>
+    `<div class="record"><span>${e.date}</span><span>${(e.ink / 10000).toFixed(1)}万</span><span class="r-stage">${t("stage")} ${stages.get(e.id)}</span><button class="del" data-del="${e.id}" type="button">×</button></div>`).join("");
+  rl.querySelectorAll("[data-del]").forEach(b => b.addEventListener("click", async () => {
+    if (confirm(t("del_confirm"))) { await deleteEntry(b.dataset.del); render(); }
+  }));
+
+  const frozen = freezePastMonths();
+  const months = Object.keys(frozen).sort().reverse();
+  // current month in progress also shows in the collection area only after it ends; here show past months
+  $("zukanList").innerHTML = months.length ? months.map(mk => {
+    const f = frozen[mk];
+    return `<div class="zukan-item"><img src="stage-${String(f.stage).padStart(2, "0")}.png" alt=""><div class="zukan-meta"><div class="z-month">${mk.replace("-", "/")}</div><div>${t("zukan_stats", f.days, f.totalInk / 10000, f.kg, f.stage)}</div><div class="z-judge">${f.judge}</div></div></div>`;
+  }).join("") : `<div class="empty">${t("no_records")}</div>`;
+}
+
 let saving = false;
 
 // ---------- events ----------
